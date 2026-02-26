@@ -38,7 +38,7 @@ def clean_nss(nss):
     if pd.isna(nss):
         return None
     nss = str(nss)
-    return int(float(nss.replace(' ', '').replace('|', '')))
+    return int(float(nss.replace(' ', '').replace('|', '')[:12]))
 
 def clean_suivis_df(suivis_df):
     suivis_df['nom'] = suivis_df['nom de naissance'].apply(clean_name)
@@ -50,7 +50,7 @@ def clean_suivis_df(suivis_df):
 def get_patient_data(input_df, year):
     patient_data = {}
     for index, row in input_df.iterrows():
-        nss = int(row['NSS'].replace(' ', ''))
+        nss = int(row['NSS'].replace(' ', '').replace('|', '')[:12])
         nom = clean_name(row['nom_jf'] if not pd.isna(row['nom_jf']) else row['nom'])
         prenom = clean_name(row['prenom'])
         ddn = clean_date(row['ddn'])
