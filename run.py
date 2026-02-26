@@ -3,7 +3,8 @@ from tkinter import filedialog, messagebox
 import pandas as pd 
 from pathlib import Path
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import PatternFill, numbers
+
 
 def clean_result(result):
     result_map = {'Négatif': '-', 'Postif': '+', '': ''}
@@ -85,6 +86,14 @@ def get_patient_index_from_ddn(suivis_df, name, ddn):
     print(f"Found patient at index {row.index.values[0] + 2}.")
     return row.index.values[0] + 2  # +2 because of header and 0-indexing
 
+def fix_formats(sheet, cols):
+    for col in cols:
+        fmt = "DD/MM/YYYY"
+        for row in sheet.iter_rows(min_row=2, min_col=col, max_col=col, max_row=sheet.max_row):
+            cell = row[0]
+            if cell.value is not None:
+                cell.number_format = fmt
+
 def fill_patient(suivis_excel, suivis_df, patient_data, year):
     sheet = suivis_excel[str(year)]
     print(patient_data)
@@ -112,6 +121,7 @@ def fill_patient(suivis_excel, suivis_df, patient_data, year):
             sheet.cell(row=row_index, column=32).fill = none_color 
         else: 
             sheet.cell(row=row_index, column=32).fill = else_color
+        fix_formats(sheet, [1, 8, 15, 19, 20, 26, 27, 32, 33, 34, 43, 44, 45, 47, 48, 58, 59])
 
 
     return suivis_excel
@@ -127,7 +137,6 @@ def run_update(input_file, suivis_file, year, overwrite):
     updated_suvis_excel = fill_patient(suivis_excel, suivis_df, patient_data, year)
     if updated_suvis_excel is None:
         raise ValueError("Update failed due to missing NSS entries. Check console output.")
-
     if overwrite:
         output_path = suivis_file
     else:
