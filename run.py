@@ -26,7 +26,7 @@ def get_age(ddn, year):
 def get_rang(age):
     if age is None:
         return None
-    rang = min((age - 50)// 2 + 1, 12)
+    rang = min((age - 50)// 2 + 1, 13) # A verifier 
     return f'R{rang}'
 
 def clean_name(name):
@@ -63,7 +63,7 @@ def get_patient_data(input_df, year):
     return patient_data
 
 def get_patient_index(suivis_df, patient_nss):
-    row = suivis_df.loc[suivis_df['immatriculation sécu entrer les chiffres sans espace (mise en forme spécifique)'] == patient_nss]
+    row = suivis_df.loc[suivis_df['nss'] == patient_nss]
     if row.empty:
         print(f"Patient with NSS {patient_nss} not found in suivis_df.")
         return None
@@ -87,7 +87,7 @@ def get_patient_index_from_ddn(suivis_df, name, ddn):
 
 def fill_patient(suivis_excel, suivis_df, patient_data, year):
     sheet = suivis_excel[str(year)]
-
+    print(patient_data)
     for patient_nss, data in patient_data.items():
         row_index = get_patient_index(suivis_df, patient_nss)
         # row_index = get_patient_index_from_ddn(suivis_df, data['nom'], data['ddn'])
