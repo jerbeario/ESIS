@@ -6,58 +6,92 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 def clean_result(result):
-    result_map = {'Négatif': '-', 'Postif': '+', '': 'N.A.'}
+    result_map = {'Négatif': '-', 'Postif': '+', '': ''}
     return result_map.get(result, 'N.A.')
 
 def clean_date(date):
     if pd.isna(date):
         return None
+    if isinstance(date, pd.Timestamp):
+        return date.strftime('%d/%m/%Y')
     parts = date.split('/')
-    return f"{parts[1]}/{parts[0]}/{parts[2]}"
+    return f"{parts[0]}/{parts[1]}/{parts[2]}"
 
 def get_age(ddn, year):
     if pd.isna(ddn):
         return None
     age = year - pd.to_datetime(ddn, dayfirst=True).year
-    return age
+    return age - 1
 
 def get_rang(age):
     if age is None:
         return None
-    rang = max((age - 50)// 2 + 1, 12)
+    rang = min((age - 50)// 2 + 1, 12)
     return f'R{rang}'
 
+def clean_name(name):
+    if pd.isna(name):
+        return None
+    return name.strip().lower()
+
+def clean_nss(nss):
+    if pd.isna(nss):
+        return None
+    nss = str(nss)
+    return int(float(nss.replace(' ', '').replace('|', '')))
+
+def clean_suivis_df(suivis_df):
+    suivis_df['nom'] = suivis_df['nom de naissance'].apply(clean_name)
+    suivis_df['prenom'] = suivis_df['prénom'].apply(clean_name)
+    suivis_df['ddn'] = suivis_df['date de naissance '].apply(clean_date)
+    suivis_df['nss'] = suivis_df['immatriculation sécu entrer les chiffres sans espace (mise en forme spécifique)'].apply(clean_nss)
+    return suivis_df
+
 def get_patient_data(input_df, year):
-    """
-    Extract nss, test date, result and previous test data from the E SIS export DataFrame. 
-    Returns a dictionary with nss as keys and a dictionary of test data as values. 
-    Entries with missing data are filled with nan.
-    """
-    result_map = {'Négatif': '-', 'Postif': '+', '': 'N.A.'}
     patient_data = {}
     for index, row in input_df.iterrows():
-        nss = int(row['NSS'].replace(' ', '')) 
+        nss = int(row['NSS'].replace(' ', ''))
+        nom = clean_name(row['nom_jf'] if not pd.isna(row['nom_jf']) else row['nom'])
+        prenom = clean_name(row['prenom'])
+        ddn = clean_date(row['ddn'])
         test_date = clean_date(row['date_Realisation_test'])
         test_result = clean_result(row['resultat_test'])
         last_test_date = clean_date(row['date_Test_Avant_Invitation'])
-        age = get_age(row['ddn'], year - 1)
+        age = get_age(ddn, year)
         rang = get_rang(age)
-
-        patient_data[nss] = {'age': age, 'test_date': test_date, 'test_result': test_result, 'last_test_date': last_test_date, 'rang': rang}
+        patient_data[nss] = {'age': age, 'test_date': test_date, 'test_result': test_result, 'last_test_date': last_test_date, 'rang': rang, 'nom': nom, 'prenom': prenom, 'ddn': ddn}
     return patient_data
+
+def get_patient_index(suivis_df, patient_nss):
+    row = suivis_df.loc[suivis_df['immatriculation sécu entrer les chiffres sans espace (mise en forme spécifique)'] == patient_nss]
+    if row.empty:
+        print(f"Patient with NSS {patient_nss} not found in suivis_df.")
+        return None
+    elif len(row) > 1: 
+        print(f"Multiple entries found for NSS {patient_nss}. Please check the data.")
+        return None
+    return row.index.values[0] + 2 # +2 because of header and 0-indexing
+
+def get_patient_index_from_ddn(suivis_df, name, ddn):
+    print(f"Looking for patient with name '{name}' and DDN '{ddn}' in suivis_df...")
+    row = suivis_df.loc[(suivis_df['nom'] == name) & (suivis_df['ddn'] == ddn)]
+    if row.empty:
+        print(f"Patient with name {name} and DDN {ddn} not found in suivis_df.")
+        return None
+    elif len(row) > 1:
+        print(f"Multiple entries found for name {name} and DDN {ddn}. Please check the data.")
+        return None
+    print(f"Found patient at index {row.index.values[0] + 2}.")
+    return row.index.values[0] + 2  # +2 because of header and 0-indexing
 
 def fill_patient(suivis_excel, suivis_df, patient_data, year):
     sheet = suivis_excel[str(year)]
 
     for patient_nss, data in patient_data.items():
-        row = suivis_df.loc[suivis_df['immatriculation sécu entrer les chiffres sans espace (mise en forme spécifique)'] == patient_nss]
-        if row.empty:
-            print(f"Patient with NSS {patient_nss} not found in suivis_df.")
-            return None
-        elif len(row) > 1: 
-            print(f"Multiple entries found for NSS {patient_nss}. Please check the data.")
-
-        row_index = row.index.values[0] + 2 # +2 because of header and 0-indexing
+        row_index = get_patient_index(suivis_df, patient_nss)
+        # row_index = get_patient_index_from_ddn(suivis_df, data['nom'], data['ddn'])
+        if row_index is None:
+            continue
 
         # change cells
         sheet.cell(row=row_index, column=27).value = data['test_date']
@@ -87,6 +121,7 @@ def run_update(input_file, suivis_file, year, overwrite):
     suivis_df = pd.read_excel(suivis_file, sheet_name=str(year))
     input_df = pd.read_csv(input_file, delimiter=';')
 
+    suivis_df = clean_suivis_df(suivis_df)
     patient_data = get_patient_data(input_df, year)
     updated_suvis_excel = fill_patient(suivis_excel, suivis_df, patient_data, year)
     if updated_suvis_excel is None:
@@ -162,16 +197,16 @@ def launch_gui():
             messagebox.showerror("Invalid year", "Year must be a number (e.g., 2025).")
             return
 
-        try:
-            output_path = run_update(
-                Path(input_path),
-                Path(suivis_path),
-                year,
-                overwrite_var.get(),
-            )
-        except Exception as exc:
-            messagebox.showerror("Error", f"Failed to update: {exc}")
-            return
+        # try:
+        output_path = run_update(
+            Path(input_path),
+            Path(suivis_path),
+            year,
+            overwrite_var.get(),
+        )
+        # except Exception as exc:
+        #     messagebox.showerror("Error", f"Failed to update: {exc}")
+        #     return
 
         messagebox.showinfo("Done", f"Saved: {output_path}")
         root.destroy()
