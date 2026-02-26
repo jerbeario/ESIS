@@ -38,7 +38,7 @@ def clean_nss(nss):
     if pd.isna(nss):
         return None
     nss = str(nss)
-    return int(float(nss.replace(' ', '').replace('|', '')[:12]))
+    return int(float(nss.replace(' ', '').replace('|', '')[:13]))
 
 def clean_suivis_df(suivis_df):
     suivis_df['nom'] = suivis_df['nom de naissance'].apply(clean_name)
@@ -50,7 +50,7 @@ def clean_suivis_df(suivis_df):
 def get_patient_data(input_df, year):
     patient_data = {}
     for index, row in input_df.iterrows():
-        nss = int(row['NSS'].replace(' ', '').replace('|', '')[:12])
+        nss = int(row['NSS'].replace(' ', '').replace('|', '')[:13])
         nom = clean_name(row['nom_jf'] if not pd.isna(row['nom_jf']) else row['nom'])
         prenom = clean_name(row['prenom'])
         ddn = clean_date(row['ddn'])
@@ -70,6 +70,7 @@ def get_patient_index(suivis_df, patient_nss):
     elif len(row) > 1: 
         print(f"Multiple entries found for NSS {patient_nss}. Please check the data.")
         return None
+    print(f"Found patient at index {row.index.values[0] + 2}.")
     return row.index.values[0] + 2 # +2 because of header and 0-indexing
 
 def get_patient_index_from_ddn(suivis_df, name, ddn):
