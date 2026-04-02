@@ -4,25 +4,41 @@ import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, numbers
+import datetime
 
 
 def clean_result(result):
-    result_map = {'Négatif': '-', 'Postif': '+', '': ''}
-    return result_map.get(result, 'N.A.')
+    result_map = {'Négatif': '-', 'Postif': '+'}
+    return result_map.get(result, '')
 
-def clean_date(date):
-    if pd.isna(date):
+def clean_date(value):
+    if pd.isna(value):
         return None
-    if isinstance(date, pd.Timestamp):
-        return date.strftime('%d/%m/%Y')
-    parts = date.split('/')
-    return f"{parts[0]}/{parts[1]}/{parts[2]}"
+    if isinstance(value, datetime.datetime):
+        return value.date()
+    if isinstance(value, datetime.date):
+        return value
+    try:
+        parsed = pd.to_datetime(value, dayfirst=True, errors="coerce")
+    except Exception:
+        return None
+    if pd.isna(parsed):
+        return None
+    return parsed.date()
 
 def get_age(ddn, year):
-    if pd.isna(ddn):
+    if ddn is None or pd.isna(ddn):
         return None
-    age = year - pd.to_datetime(ddn, dayfirst=True).year
-    return age - 1
+    if isinstance(ddn, datetime.datetime):
+        birth_year = ddn.year
+    elif isinstance(ddn, datetime.date):
+        birth_year = ddn.year
+    else:
+        parsed = pd.to_datetime(ddn, dayfirst=True, errors="coerce")
+        if pd.isna(parsed):
+            return None
+        birth_year = parsed.year
+    return (year - birth_year) - 1
 
 def get_rang(age):
     if age is None:
@@ -88,7 +104,7 @@ def get_patient_index_from_ddn(suivis_df, name, ddn):
 
 def fix_formats(sheet, cols):
     for col in cols:
-        fmt = "DD/MM/YYYY"
+        fmt = "dd/mm/yyyy"
         for row in sheet.iter_rows(min_row=2, min_col=col, max_col=col, max_row=sheet.max_row):
             cell = row[0]
             if cell.value is not None:
