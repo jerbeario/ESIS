@@ -68,7 +68,9 @@ def clean_suivis_df(suivis_df):
 def get_patient_data(input_df, year):
     patient_data = {}
     for index, row in input_df.iterrows():
-        nss = int(row['NSS'].replace(' ', '').replace('|', '')[:13])
+        nss = clean_nss(row['NSS'])
+        if pd.isna(nss):
+            continue
         nom = clean_name(row['nom_jf'] if not pd.isna(row['nom_jf']) else row['nom'])
         prenom = clean_name(row['prenom'])
         ddn = clean_date(row['ddn'])
