@@ -54,8 +54,9 @@ def clean_name(name):
 def clean_nss(nss):
     if pd.isna(nss):
         return None
-    nss = str(nss)
-    return int(float(nss.replace(' ', '').replace('|', '')[:13]))
+    # Make nss string, remove all but numbers
+    nss = ''.join(filter(str.isdigit, str(nss)))
+    return int(float(nss[:13]))
 
 def clean_suivis_df(suivis_df):
     suivis_df['nom'] = suivis_df['nom de naissance'].apply(clean_name)
